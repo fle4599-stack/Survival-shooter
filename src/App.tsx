@@ -63,7 +63,7 @@ export default function App() {
   }, []);
 
   return (
-    <main className="relative w-screen h-screen overflow-hidden bg-black text-white select-none">
+    <main className="relative w-screen h-screen overflow-hidden bg-[#221812] text-white select-none">
       {/* 2D Canvas Engine (always mounted for crisp background and freeze-frame) */}
       <GameCanvas
         gameState={gameState}

@@ -86,7 +86,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     return WEAPON_TIERS[0]; // Pistol (1 shot/sec)
   }, []);
 
-  // Spawn a wave of zombies: Fibonacci sequence 1, 2, 3, 5, 8, 13, 21... (CR6)
+  // Spawn a wave of zombies: 1, 2, 3, 4, 5, 6... (CR11)
   const spawnWave = useCallback((waveNum: number) => {
     const engine = engineRef.current;
     const count = getWaveZombieCount(waveNum);
@@ -133,13 +133,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           break;
       }
 
-      // All zombies identical size and speed
+      // All zombies identical size and speed (CR9: halved speed)
       engine.zombies.push({
         id: engine.zombieIdCounter++,
         x: sx,
         y: sy,
         radius: 16,
-        speed: 105, // Uniform speed
+        speed: 52.5, // Halved from 105 for better tactical kiting
         state: 'alive',
         stateTimer: 0,
         rot: Math.random() * Math.PI * 2,
@@ -670,12 +670,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.translate(sx, sy);
       }
 
-      // 3.1 Dark arena floor
-      ctx.fillStyle = '#08080a';
+      // 3.1 Earthy arena floor (CR10: warm soil tone between black and dark brown)
+      ctx.fillStyle = '#221812';
       ctx.fillRect(0, 0, engine.width, engine.height);
 
-      // Arena tile grid
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
+      // Organic soil / arena grid
+      ctx.strokeStyle = 'rgba(215, 175, 135, 0.045)';
       ctx.lineWidth = 1;
       const gridSize = 60;
       for (let x = 0; x < engine.width; x += gridSize) {
@@ -692,7 +692,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
 
       // Arena boundary hazard border
-      ctx.strokeStyle = 'rgba(225, 29, 72, 0.2)';
+      ctx.strokeStyle = 'rgba(225, 45, 60, 0.22)';
       ctx.lineWidth = 3;
       ctx.strokeRect(6, 6, engine.width - 12, engine.height - 12);
 
@@ -920,7 +920,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         Math.max(engine.width, engine.height) * 0.75
       );
       grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-      grad.addColorStop(1, 'rgba(0, 0, 0, 0.75)');
+      grad.addColorStop(1, 'rgba(12, 7, 4, 0.72)');
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, engine.width, engine.height);
 

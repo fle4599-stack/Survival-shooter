@@ -68,7 +68,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
         </h1>
 
         <p className="max-w-xl text-neutral-300 text-sm sm:text-base leading-relaxed mb-8">
-          Орда зомби нарастает <span className="text-rose-400 font-bold font-mono">каждые 5 секунд</span> (1, 2, 3, 5, 8, 13, 21...).
+          Орда зомби нарастает <span className="text-rose-400 font-bold font-mono">каждые 5 секунд</span> (1, 2, 3, 4, 5, 6...).
           Двигайся клавишами <span className="text-white font-bold font-mono">WASD</span>, целься и стреляй мышью.
         </p>
 

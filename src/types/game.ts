@@ -53,27 +53,17 @@ export const WEAPON_TIERS: WeaponConfig[] = [
 ];
 
 /**
- * Fibonacci zombie count per wave:
+ * Linear zombie count per wave (CR11):
  * Wave 1: 1
  * Wave 2: 2
  * Wave 3: 3
- * Wave 4: 5
- * Wave 5: 8
- * Wave 6: 13
- * Wave 7: 21
+ * Wave 4: 4
+ * Wave 5: 5
+ * Wave 6: 6
  * ...
  */
 export const getWaveZombieCount = (wave: number): number => {
-  if (wave <= 1) return 1;
-  if (wave === 2) return 2;
-  let a = 1;
-  let b = 2;
-  for (let i = 3; i <= wave; i++) {
-    const c = a + b;
-    a = b;
-    b = c;
-  }
-  return Math.min(b, 2048);
+  return Math.max(1, wave);
 };
 
 export interface Player {
