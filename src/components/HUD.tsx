@@ -1,6 +1,6 @@
 import React from 'react';
 import { Volume2, VolumeX, Crosshair, Skull, ShieldAlert, Timer } from 'lucide-react';
-import { WeaponConfig } from '../types/game';
+import { WeaponConfig, getWaveZombieCount } from '../types/game';
 
 interface HUDProps {
   kills: number;
@@ -48,8 +48,8 @@ export const HUD: React.FC<HUDProps> = ({
     progressPct = 100;
   }
 
-  // Zombie count in current wave = 2^currentWave
-  const zombiesInWave = Math.pow(2, currentWave);
+  // Zombie count in current wave = Fibonacci sequence (1, 2, 3, 5, 8, 13, 21...)
+  const zombiesInWave = getWaveZombieCount(currentWave);
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 p-4 select-none z-20 flex flex-col gap-2">
@@ -89,7 +89,7 @@ export const HUD: React.FC<HUDProps> = ({
           </div>
 
           <div className="flex items-center gap-2 text-xs text-neutral-400 mt-0.5">
-            <span>+{zombiesInWave} зомби (2^{currentWave})</span>
+            <span>+{zombiesInWave} зомби</span>
           </div>
 
           {/* 5s wave loop bar */}

@@ -23,7 +23,7 @@ export const WEAPON_TIERS: WeaponConfig[] = [
     bulletSize: 4,
     damage: 1,
     minKills: 0,
-    maxKills: 99,
+    maxKills: 19,
     soundType: 'pistol',
   },
   {
@@ -34,8 +34,8 @@ export const WEAPON_TIERS: WeaponConfig[] = [
     bulletSpeed: 950,
     bulletSize: 4.5,
     damage: 1,
-    minKills: 100,
-    maxKills: 249,
+    minKills: 20,
+    maxKills: 49,
     soundType: 'smg',
   },
   {
@@ -46,11 +46,35 @@ export const WEAPON_TIERS: WeaponConfig[] = [
     bulletSpeed: 1100,
     bulletSize: 5,
     damage: 1,
-    minKills: 250,
+    minKills: 50,
     maxKills: null,
     soundType: 'heavy',
   },
 ];
+
+/**
+ * Fibonacci zombie count per wave:
+ * Wave 1: 1
+ * Wave 2: 2
+ * Wave 3: 3
+ * Wave 4: 5
+ * Wave 5: 8
+ * Wave 6: 13
+ * Wave 7: 21
+ * ...
+ */
+export const getWaveZombieCount = (wave: number): number => {
+  if (wave <= 1) return 1;
+  if (wave === 2) return 2;
+  let a = 1;
+  let b = 2;
+  for (let i = 3; i <= wave; i++) {
+    const c = a + b;
+    a = b;
+    b = c;
+  }
+  return Math.min(b, 2048);
+};
 
 export interface Player {
   x: number;

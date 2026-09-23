@@ -10,6 +10,7 @@ import {
   GameStats,
   WEAPON_TIERS,
   WeaponConfig,
+  getWaveZombieCount,
 } from '../types/game';
 import { soundManager } from '../audio/soundManager';
 import { HUD } from './HUD';
@@ -78,18 +79,17 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     isDead: false,
   });
 
-  // Weapon tier lookup helper
+  // Weapon tier lookup helper (CR8: 0-19 pistol, 20-49 smg, 50+ heavy)
   const getWeaponForKills = useCallback((kills: number): WeaponConfig => {
-    if (kills >= 250) return WEAPON_TIERS[2]; // Heavy Rifle (5 shots/sec)
-    if (kills >= 100) return WEAPON_TIERS[1]; // SMG (3 shots/sec)
+    if (kills >= 50) return WEAPON_TIERS[2]; // Heavy Rifle (5 shots/sec)
+    if (kills >= 20) return WEAPON_TIERS[1]; // SMG (3 shots/sec)
     return WEAPON_TIERS[0]; // Pistol (1 shot/sec)
   }, []);
 
-  // Spawn a wave of 2^n zombies
+  // Spawn a wave of zombies: Fibonacci sequence 1, 2, 3, 5, 8, 13, 21... (CR6)
   const spawnWave = useCallback((waveNum: number) => {
     const engine = engineRef.current;
-    // Formula from prompt: 2^n zombies
-    const count = Math.min(Math.pow(2, waveNum), 2048);
+    const count = getWaveZombieCount(waveNum);
     const w = engine.width;
     const h = engine.height;
     const padding = 45; // spawn outside visible borders
@@ -273,7 +273,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     setHudWeapon(WEAPON_TIERS[0]);
     setFreezeCountdown(3.0);
 
-    // Spawn first wave (2^1 = 2 zombies)
+    // Spawn first wave (1 zombie)
     spawnWave(1);
     soundManager.startAmbient();
   }, [spawnWave]);
@@ -510,8 +510,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
               })),
             });
 
-            // Weapon progression checks
-            if (engine.kills === 100) {
+            // Weapon progression checks (CR8: 20 kills -> SMG, 50 kills -> Heavy Rifle)
+            if (engine.kills === 20) {
               soundManager.playWeaponUpgrade();
               engine.floatingTexts.push({
                 id: engine.textIdCounter++,
@@ -523,7 +523,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
                 maxLife: 2.5,
                 size: 20,
               });
-            } else if (engine.kills === 250) {
+            } else if (engine.kills === 50) {
               soundManager.playWeaponUpgrade();
               engine.floatingTexts.push({
                 id: engine.textIdCounter++,

@@ -68,7 +68,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
         </h1>
 
         <p className="max-w-xl text-neutral-300 text-sm sm:text-base leading-relaxed mb-8">
-          Орда зомби удваивается <span className="text-rose-400 font-bold font-mono">каждые 5 секунд</span> (2, 4, 8, 16, 32...).
+          Орда зомби нарастает <span className="text-rose-400 font-bold font-mono">каждые 5 секунд</span> (1, 2, 3, 5, 8, 13, 21...).
           Двигайся клавишами <span className="text-white font-bold font-mono">WASD</span>, целься и стреляй мышью.
         </p>
 
@@ -105,15 +105,15 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
           </div>
           <div className="flex flex-col gap-1 text-[11px] text-neutral-300 font-mono">
             <div className="flex justify-between">
-              <span>0–99 фрагов:</span>
+              <span>0–19 фрагов:</span>
               <span className="text-amber-300">Пистолет (1 в/сек)</span>
             </div>
             <div className="flex justify-between">
-              <span>100–249 фрагов:</span>
+              <span>20–49 фрагов:</span>
               <span className="text-amber-400 font-semibold">Автомат (3 в/сек)</span>
             </div>
             <div className="flex justify-between">
-              <span>250+ фрагов:</span>
+              <span>50+ фрагов:</span>
               <span className="text-rose-400 font-bold">Тяжелый авт. (5 в/сек)</span>
             </div>
           </div>
