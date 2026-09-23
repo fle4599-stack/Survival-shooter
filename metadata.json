@@ -1,0 +1,6 @@
+{
+  "name": "Last Minute Chance",
+  "description": "Infinite top-down 2D survival shooter with exponential zombie hordes, weapon tiers, and relentless action.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
