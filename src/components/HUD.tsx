@@ -48,7 +48,7 @@ export const HUD: React.FC<HUDProps> = ({
     progressPct = 100;
   }
 
-  // Zombie count in current wave = Fibonacci sequence (1, 2, 3, 5, 8, 13, 21...)
+  // Zombie count in current wave = Linear progression (1, 2, 3, 4, 5, 6...)
   const zombiesInWave = getWaveZombieCount(currentWave);
 
   return (

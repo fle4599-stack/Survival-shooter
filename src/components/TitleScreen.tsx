@@ -69,7 +69,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
 
         <p className="max-w-xl text-neutral-300 text-sm sm:text-base leading-relaxed mb-8">
           Орда зомби нарастает <span className="text-rose-400 font-bold font-mono">каждые 5 секунд</span> (1, 2, 3, 4, 5, 6...).
-          Двигайся клавишами <span className="text-white font-bold font-mono">WASD</span>, целься и стреляй мышью.
+          Герой <span className="text-amber-300 font-semibold">стреляет сам без остановок</span>. Управляй движением (WASD или левый джойстик) и прицелом (мышь или правый джойстик).
         </p>
 
         {/* The single prominent Play button */}
@@ -88,13 +88,13 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
         <div className="bg-neutral-950/80 border border-neutral-900 rounded-lg p-3.5 flex flex-col gap-1.5">
           <div className="flex items-center gap-2 font-semibold text-rose-400 font-cinzel">
             <Crosshair className="w-4 h-4 text-rose-500" />
-            <span>УПРАВЛЕНИЕ</span>
+            <span>УПРАВЛЕНИЕ (ПК И ТЕЛЕФОН)</span>
           </div>
           <p className="text-neutral-400">
-            Движение: <strong className="text-white font-mono">W, A, S, D</strong>. Оружие и прицел смотрят в мышь.
+            ПК: <strong className="text-white font-mono">WASD</strong> + мышь. Смартфон: <strong className="text-white">левый джойстик</strong> — бег, <strong className="text-white">правый</strong> — прицел.
           </p>
-          <span className="text-neutral-300 font-mono mt-auto text-[11px]">
-            ЛКМ — огонь (зажми для непрерывной стрельбы)
+          <span className="text-emerald-400 font-mono mt-auto text-[11px] font-semibold">
+            Стрельба ведется автоматически и непрерывно!
           </span>
         </div>
 

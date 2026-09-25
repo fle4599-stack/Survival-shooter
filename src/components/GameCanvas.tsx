@@ -39,6 +39,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const [isMuted, setIsMuted] = useState<boolean>(soundManager.getMuted());
   const [freezeCountdown, setFreezeCountdown] = useState<number>(3.0);
 
+  // Mobile Touch Controls State (CR14)
+  const [isTouchDevice, setIsTouchDevice] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  });
+  const [moveKnob, setMoveKnob] = useState<{ x: number; y: number; active: boolean }>({ x: 0, y: 0, active: false });
+  const [aimKnob, setAimKnob] = useState<{ x: number; y: number; active: boolean }>({ x: 0, y: 0, active: false });
+
+  const moveTouchRef = useRef<{ id: number | null; startX: number; startY: number }>({ id: null, startX: 0, startY: 0 });
+  const aimTouchRef = useRef<{ id: number | null; startX: number; startY: number }>({ id: null, startX: 0, startY: 0 });
+  const leftPadRef = useRef<HTMLDivElement | null>(null);
+  const rightPadRef = useRef<HTMLDivElement | null>(null);
+
   // Game engine references (mutable without re-renders for 60fps canvas performance)
   const engineRef = useRef({
     width: window.innerWidth,
@@ -46,6 +58,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     mouseX: window.innerWidth / 2,
     mouseY: window.innerHeight / 2,
     isMouseDown: false,
+    touchMoveVector: { x: 0, y: 0 },
+    isTouchDevice: false,
+    isTouchAimActive: false,
     keysPressed: {} as Record<string, boolean>,
     player: {
       x: window.innerWidth / 2,
@@ -226,7 +241,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     engine.mouseX = w / 2;
     engine.mouseY = h / 2;
     engine.isMouseDown = false;
+    engine.touchMoveVector = { x: 0, y: 0 };
+    engine.isTouchAimActive = false;
     engine.keysPressed = {};
+    moveTouchRef.current = { id: null, startX: 0, startY: 0 };
+    aimTouchRef.current = { id: null, startX: 0, startY: 0 };
+    setMoveKnob({ x: 0, y: 0, active: false });
+    setAimKnob({ x: 0, y: 0, active: false });
     engine.player = {
       x: w / 2,
       y: h / 2,
@@ -381,6 +402,184 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     };
   }, [gameState, tryShoot]);
 
+  // Mobile Touch Input Handlers (CR14)
+  useEffect(() => {
+    const handleTouchStart = (e: TouchEvent) => {
+      if (gameState !== 'PLAYING') return;
+      setIsTouchDevice(true);
+      engineRef.current.isTouchDevice = true;
+
+      const engine = engineRef.current;
+      const w = window.innerWidth;
+
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+
+        // Left half = Movement Joystick
+        if (touch.clientX < w * 0.5) {
+          if (moveTouchRef.current.id === null) {
+            moveTouchRef.current.id = touch.identifier;
+            let originX = touch.clientX;
+            let originY = touch.clientY;
+
+            if (leftPadRef.current) {
+              const rect = leftPadRef.current.getBoundingClientRect();
+              const padCenterX = rect.left + rect.width / 2;
+              const padCenterY = rect.top + rect.height / 2;
+              if (Math.hypot(touch.clientX - padCenterX, touch.clientY - padCenterY) < 130) {
+                originX = padCenterX;
+                originY = padCenterY;
+              }
+            }
+
+            moveTouchRef.current.startX = originX;
+            moveTouchRef.current.startY = originY;
+
+            const dx = touch.clientX - originX;
+            const dy = touch.clientY - originY;
+            const dist = Math.hypot(dx, dy);
+            const maxR = 45;
+            const clamped = Math.min(dist, maxR);
+            const nx = dist > 0 ? (dx / dist) * (clamped / maxR) : 0;
+            const ny = dist > 0 ? (dy / dist) * (clamped / maxR) : 0;
+
+            engine.touchMoveVector = { x: nx, y: ny };
+            setMoveKnob({
+              x: dist > 0 ? (dx / dist) * clamped : 0,
+              y: dist > 0 ? (dy / dist) * clamped : 0,
+              active: true,
+            });
+          }
+        } else {
+          // Right half = Aim Joystick & Touch aim
+          if (aimTouchRef.current.id === null) {
+            aimTouchRef.current.id = touch.identifier;
+            engine.isTouchAimActive = true;
+
+            let originX = touch.clientX;
+            let originY = touch.clientY;
+
+            if (rightPadRef.current) {
+              const rect = rightPadRef.current.getBoundingClientRect();
+              const padCenterX = rect.left + rect.width / 2;
+              const padCenterY = rect.top + rect.height / 2;
+              if (Math.hypot(touch.clientX - padCenterX, touch.clientY - padCenterY) < 130) {
+                originX = padCenterX;
+                originY = padCenterY;
+              }
+            }
+
+            aimTouchRef.current.startX = originX;
+            aimTouchRef.current.startY = originY;
+
+            const p = engine.player;
+            const aimAngle = Math.atan2(touch.clientY - p.y, touch.clientX - p.x);
+            engine.mouseX = p.x + Math.cos(aimAngle) * 200;
+            engine.mouseY = p.y + Math.sin(aimAngle) * 200;
+            p.angle = aimAngle;
+
+            const dx = touch.clientX - originX;
+            const dy = touch.clientY - originY;
+            const dist = Math.hypot(dx, dy);
+            const maxR = 45;
+            const clamped = Math.min(dist, maxR);
+
+            setAimKnob({
+              x: dist > 0 ? (dx / dist) * clamped : 0,
+              y: dist > 0 ? (dy / dist) * clamped : 0,
+              active: true,
+            });
+          }
+        }
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (gameState !== 'PLAYING') return;
+      // Prevent browser zooming / scrolling during gameplay
+      e.preventDefault();
+      const engine = engineRef.current;
+
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+
+        if (touch.identifier === moveTouchRef.current.id) {
+          const dx = touch.clientX - moveTouchRef.current.startX;
+          const dy = touch.clientY - moveTouchRef.current.startY;
+          const dist = Math.hypot(dx, dy);
+          const maxR = 45;
+          const clamped = Math.min(dist, maxR);
+          const nx = dist > 0 ? (dx / dist) * (clamped / maxR) : 0;
+          const ny = dist > 0 ? (dy / dist) * (clamped / maxR) : 0;
+
+          engine.touchMoveVector = { x: nx, y: ny };
+          setMoveKnob({
+            x: dist > 0 ? (dx / dist) * clamped : 0,
+            y: dist > 0 ? (dy / dist) * clamped : 0,
+            active: true,
+          });
+        } else if (touch.identifier === aimTouchRef.current.id) {
+          const dx = touch.clientX - aimTouchRef.current.startX;
+          const dy = touch.clientY - aimTouchRef.current.startY;
+          const dist = Math.hypot(dx, dy);
+          const maxR = 45;
+          const clamped = Math.min(dist, maxR);
+
+          const p = engine.player;
+          if (dist > 8) {
+            const angle = Math.atan2(dy, dx);
+            engine.mouseX = p.x + Math.cos(angle) * 200;
+            engine.mouseY = p.y + Math.sin(angle) * 200;
+            p.angle = angle;
+          } else {
+            const aimAngle = Math.atan2(touch.clientY - p.y, touch.clientX - p.x);
+            engine.mouseX = touch.clientX;
+            engine.mouseY = touch.clientY;
+            p.angle = aimAngle;
+          }
+
+          setAimKnob({
+            x: dist > 0 ? (dx / dist) * clamped : 0,
+            y: dist > 0 ? (dy / dist) * clamped : 0,
+            active: true,
+          });
+        }
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      const engine = engineRef.current;
+
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const touch = e.changedTouches[i];
+
+        if (touch.identifier === moveTouchRef.current.id) {
+          moveTouchRef.current.id = null;
+          engine.touchMoveVector = { x: 0, y: 0 };
+          setMoveKnob({ x: 0, y: 0, active: false });
+        }
+
+        if (touch.identifier === aimTouchRef.current.id) {
+          aimTouchRef.current.id = null;
+          engine.isTouchAimActive = false;
+          setAimKnob({ x: 0, y: 0, active: false });
+        }
+      }
+    };
+
+    window.addEventListener('touchstart', handleTouchStart, { passive: false });
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
+    window.addEventListener('touchend', handleTouchEnd);
+    window.addEventListener('touchcancel', handleTouchEnd);
+
+    return () => {
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, [gameState]);
+
   // Initialize game when gameState transitions to PLAYING
   useEffect(() => {
     if (gameState === 'PLAYING') {
@@ -416,12 +615,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           spawnWave(engine.currentWave);
         }
 
-        // Automatic continuous shooting when LMB is held down
-        if (engine.isMouseDown) {
-          tryShoot();
-        }
+        // CR14: Hero fires continuously without stopping
+        tryShoot();
 
-        // CR2: Player movement via WASD keys (no longer follows mouse cursor)
+        // CR2 & CR14: Player movement via WASD keys or Mobile Touch Joystick
         const p = engine.player;
         const keys = engine.keysPressed;
         let moveX = 0;
@@ -433,10 +630,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         if (keys['KeyA'] || keys['ArrowLeft'] || keys['a'] || keys['ф']) moveX -= 1;
         if (keys['KeyD'] || keys['ArrowRight'] || keys['d'] || keys['в']) moveX += 1;
 
-        if (moveX !== 0 && moveY !== 0) {
-          // Normalize diagonal movement speed
-          moveX *= Math.SQRT1_2;
-          moveY *= Math.SQRT1_2;
+        // Combine with mobile virtual joystick input (CR14)
+        if (engine.touchMoveVector.x !== 0 || engine.touchMoveVector.y !== 0) {
+          moveX += engine.touchMoveVector.x;
+          moveY += engine.touchMoveVector.y;
+        }
+
+        const moveLen = Math.hypot(moveX, moveY);
+        if (moveLen > 1) {
+          moveX /= moveLen;
+          moveY /= moveLen;
         }
 
         if (moveX !== 0 || moveY !== 0) {
@@ -448,7 +651,26 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         p.x = Math.max(p.radius + 8, Math.min(engine.width - p.radius - 8, p.x));
         p.y = Math.max(p.radius + 8, Math.min(engine.height - p.radius - 8, p.y));
 
-        // Player gun barrel & gaze strictly point towards mouse cursor
+        // CR14: Mobile auto-aim when player is not actively holding manual aim
+        if (engine.isTouchDevice && !engine.isTouchAimActive) {
+          let closestZ: Zombie | null = null;
+          let minDist = Infinity;
+          for (let zIdx = 0; zIdx < engine.zombies.length; zIdx++) {
+            const z = engine.zombies[zIdx];
+            if (z.state !== 'alive') continue;
+            const dist = Math.hypot(z.x - p.x, z.y - p.y);
+            if (dist < minDist) {
+              minDist = dist;
+              closestZ = z;
+            }
+          }
+          if (closestZ) {
+            engine.mouseX = closestZ.x;
+            engine.mouseY = closestZ.y;
+          }
+        }
+
+        // Player gun barrel & gaze strictly point towards mouse / aim target
         const dx = engine.mouseX - p.x;
         const dy = engine.mouseY - p.y;
         p.angle = Math.atan2(dy, dx);
@@ -745,6 +967,33 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           ctx.arc(0, 0, z.radius + 2, 0, Math.PI * 2);
           ctx.stroke();
 
+          // CR15: Stiff frozen outstretched arms & hands in shock
+          ctx.strokeStyle = '#3f6212';
+          ctx.lineWidth = 4;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(1, -11);
+          ctx.lineTo(z.radius + 10, -7);
+          ctx.moveTo(1, 11);
+          ctx.lineTo(z.radius + 10, 7);
+          ctx.stroke();
+
+          // Frozen pale hands & claws
+          ctx.fillStyle = '#4d7c0f';
+          ctx.beginPath();
+          ctx.arc(z.radius + 10, -7, 3, 0, Math.PI * 2);
+          ctx.arc(z.radius + 10, 7, 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = '#1e3a12';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(z.radius + 10, -7);
+          ctx.lineTo(z.radius + 14, -7);
+          ctx.moveTo(z.radius + 10, 7);
+          ctx.lineTo(z.radius + 14, 7);
+          ctx.stroke();
+
           // Frozen pale rotten head
           ctx.fillStyle = '#3f6212';
           ctx.beginPath();
@@ -770,6 +1019,77 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.save();
         ctx.translate(z.x, z.y);
         ctx.rotate(z.rot);
+
+        // CR15: Schematic zombie arms & hands reaching towards player
+        const reachSway = Math.sin((timestamp + z.id * 350) * 0.007) * 3;
+        const leftArmReach = z.radius + 12 + reachSway;
+        const rightArmReach = z.radius + 12 - reachSway;
+
+        const leftShoulderY = -z.radius * 0.72; // ~ -11.5
+        const rightShoulderY = z.radius * 0.72; // ~ +11.5
+
+        // Shoulders tattered cloth
+        ctx.fillStyle = '#262626';
+        ctx.beginPath();
+        ctx.ellipse(-1, leftShoulderY, 4.5, 3.5, 0, 0, Math.PI * 2);
+        ctx.ellipse(-1, rightShoulderY, 4.5, 3.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Left arm limb reaching towards player (+X)
+        ctx.strokeStyle = '#365314'; // Rotting olive dark green
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(0, leftShoulderY);
+        ctx.lineTo(leftArmReach * 0.55, leftShoulderY * 0.75);
+        ctx.lineTo(leftArmReach, leftShoulderY * 0.5);
+        ctx.stroke();
+
+        // Left hand palm
+        ctx.fillStyle = '#4d7c0f';
+        ctx.beginPath();
+        ctx.arc(leftArmReach, leftShoulderY * 0.5, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Left schematic grasping claws / fingers pointing at player
+        ctx.strokeStyle = '#1e3a12';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(leftArmReach, leftShoulderY * 0.5);
+        ctx.lineTo(leftArmReach + 5, leftShoulderY * 0.5);
+        ctx.moveTo(leftArmReach, leftShoulderY * 0.5);
+        ctx.lineTo(leftArmReach + 4, leftShoulderY * 0.5 - 2.5);
+        ctx.moveTo(leftArmReach, leftShoulderY * 0.5);
+        ctx.lineTo(leftArmReach + 4, leftShoulderY * 0.5 + 2.5);
+        ctx.stroke();
+
+        // Right arm limb reaching towards player (+X)
+        ctx.strokeStyle = '#365314';
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(0, rightShoulderY);
+        ctx.lineTo(rightArmReach * 0.55, rightShoulderY * 0.75);
+        ctx.lineTo(rightArmReach, rightShoulderY * 0.5);
+        ctx.stroke();
+
+        // Right hand palm
+        ctx.fillStyle = '#4d7c0f';
+        ctx.beginPath();
+        ctx.arc(rightArmReach, rightShoulderY * 0.5, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Right schematic grasping claws / fingers pointing at player
+        ctx.strokeStyle = '#1e3a12';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(rightArmReach, rightShoulderY * 0.5);
+        ctx.lineTo(rightArmReach + 5, rightShoulderY * 0.5);
+        ctx.moveTo(rightArmReach, rightShoulderY * 0.5);
+        ctx.lineTo(rightArmReach + 4, rightShoulderY * 0.5 - 2.5);
+        ctx.moveTo(rightArmReach, rightShoulderY * 0.5);
+        ctx.lineTo(rightArmReach + 4, rightShoulderY * 0.5 + 2.5);
+        ctx.stroke();
 
         // Rotten green head
         ctx.fillStyle = '#4d7c0f';
@@ -962,7 +1282,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   };
 
   return (
-    <div className="relative w-full h-full overflow-hidden select-none cursor-crosshair">
+    <div className="relative w-full h-full overflow-hidden select-none cursor-crosshair touch-none">
       <canvas ref={canvasRef} className="block w-full h-full cursor-crosshair" />
 
       {/* In-game HUD */}
@@ -978,6 +1298,93 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           isMuted={isMuted}
           onToggleMute={handleToggleMute}
         />
+      )}
+
+      {/* Mobile Touch Controls Overlay (CR14) */}
+      {gameState === 'PLAYING' && (isTouchDevice || (typeof window !== 'undefined' && window.innerWidth <= 1024)) && (
+        <div className="pointer-events-none absolute inset-0 z-30 select-none flex flex-col justify-end p-5 pb-7 sm:p-8 sm:pb-10">
+          {/* Subtle auto-fire indicator badge at top */}
+          <div className="absolute top-20 right-4 flex items-center gap-1.5 px-2.5 py-1 bg-neutral-950/70 backdrop-blur-md border border-emerald-500/40 rounded-full shadow-lg">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[10px] font-mono font-bold text-emerald-300 uppercase tracking-wider">
+              Авто-огонь
+            </span>
+          </div>
+
+          <div className="flex items-end justify-between w-full">
+            {/* Left Joystick: Movement */}
+            <div className="flex flex-col items-center gap-2">
+              <div
+                ref={leftPadRef}
+                className={`relative w-28 h-28 rounded-full border-2 transition-colors duration-150 backdrop-blur-sm flex items-center justify-center ${
+                  moveKnob.active
+                    ? 'border-emerald-500/70 bg-emerald-950/30 shadow-[0_0_25px_rgba(16,185,129,0.3)]'
+                    : 'border-white/20 bg-black/40 shadow-lg'
+                }`}
+              >
+                {/* Directional arrow cues */}
+                <span className="absolute top-2 text-[10px] text-neutral-400 font-bold">▲</span>
+                <span className="absolute bottom-2 text-[10px] text-neutral-400 font-bold">▼</span>
+                <span className="absolute left-2 text-[10px] text-neutral-400 font-bold">◄</span>
+                <span className="absolute right-2 text-[10px] text-neutral-400 font-bold">►</span>
+
+                {/* Inner movable thumb knob */}
+                <div
+                  className={`w-12 h-12 rounded-full border transition-transform duration-75 flex items-center justify-center ${
+                    moveKnob.active
+                      ? 'bg-gradient-to-br from-emerald-500 to-emerald-700 border-emerald-300 shadow-[0_0_15px_rgba(52,211,153,0.8)] scale-105'
+                      : 'bg-neutral-800/80 border-neutral-600 shadow-md'
+                  }`}
+                  style={{
+                    transform: `translate(${moveKnob.x}px, ${moveKnob.y}px)`,
+                  }}
+                >
+                  <div className="w-3.5 h-3.5 rounded-full bg-white/70" />
+                </div>
+              </div>
+              <span className="text-[10px] font-mono tracking-wider font-semibold text-neutral-400 uppercase">
+                Движение
+              </span>
+            </div>
+
+            {/* Right Joystick: Aim */}
+            <div className="flex flex-col items-center gap-2">
+              <div
+                ref={rightPadRef}
+                className={`relative w-28 h-28 rounded-full border-2 transition-colors duration-150 backdrop-blur-sm flex items-center justify-center ${
+                  aimKnob.active
+                    ? 'border-rose-500/70 bg-rose-950/30 shadow-[0_0_25px_rgba(244,63,94,0.3)]'
+                    : 'border-white/20 bg-black/40 shadow-lg'
+                }`}
+              >
+                {/* Aim crosshair reticle cues */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30">
+                  <div className="w-full h-0.5 bg-rose-500" />
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30">
+                  <div className="h-full w-0.5 bg-rose-500" />
+                </div>
+
+                {/* Inner movable aim knob */}
+                <div
+                  className={`w-12 h-12 rounded-full border transition-transform duration-75 flex items-center justify-center ${
+                    aimKnob.active
+                      ? 'bg-gradient-to-br from-rose-600 to-rose-800 border-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.8)] scale-105'
+                      : 'bg-neutral-800/80 border-neutral-600 shadow-md'
+                  }`}
+                  style={{
+                    transform: `translate(${aimKnob.x}px, ${aimKnob.y}px)`,
+                  }}
+                >
+                  <div className="w-2.5 h-2.5 rounded-full bg-rose-200" />
+                </div>
+              </div>
+              <span className="text-[10px] font-mono tracking-wider font-semibold text-neutral-400 uppercase">
+                Прицел
+              </span>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
