@@ -60,7 +60,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     isMouseDown: false,
     touchMoveVector: { x: 0, y: 0 },
     isTouchDevice: false,
-    isTouchAimActive: false,
     keysPressed: {} as Record<string, boolean>,
     player: {
       x: window.innerWidth / 2,
@@ -242,7 +241,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     engine.mouseY = h / 2;
     engine.isMouseDown = false;
     engine.touchMoveVector = { x: 0, y: 0 };
-    engine.isTouchAimActive = false;
     engine.keysPressed = {};
     moveTouchRef.current = { id: null, startX: 0, startY: 0 };
     aimTouchRef.current = { id: null, startX: 0, startY: 0 };
@@ -454,7 +452,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           // Right half = Aim Joystick & Touch aim
           if (aimTouchRef.current.id === null) {
             aimTouchRef.current.id = touch.identifier;
-            engine.isTouchAimActive = true;
 
             let originX = touch.clientX;
             let originY = touch.clientY;
@@ -472,17 +469,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             aimTouchRef.current.startX = originX;
             aimTouchRef.current.startY = originY;
 
-            const p = engine.player;
-            const aimAngle = Math.atan2(touch.clientY - p.y, touch.clientX - p.x);
-            engine.mouseX = p.x + Math.cos(aimAngle) * 200;
-            engine.mouseY = p.y + Math.sin(aimAngle) * 200;
-            p.angle = aimAngle;
-
             const dx = touch.clientX - originX;
             const dy = touch.clientY - originY;
             const dist = Math.hypot(dx, dy);
             const maxR = 45;
             const clamped = Math.min(dist, maxR);
+
+            const p = engine.player;
+            let aimAngle = p.angle;
+            if (dist > 8) {
+              aimAngle = Math.atan2(dy, dx);
+            } else {
+              aimAngle = Math.atan2(touch.clientY - p.y, touch.clientX - p.x);
+            }
+            p.angle = aimAngle;
+            engine.mouseX = p.x + Math.cos(aimAngle) * 300;
+            engine.mouseY = p.y + Math.sin(aimAngle) * 300;
 
             setAimKnob({
               x: dist > 0 ? (dx / dist) * clamped : 0,
@@ -526,17 +528,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           const clamped = Math.min(dist, maxR);
 
           const p = engine.player;
+          let aimAngle = p.angle;
           if (dist > 8) {
-            const angle = Math.atan2(dy, dx);
-            engine.mouseX = p.x + Math.cos(angle) * 200;
-            engine.mouseY = p.y + Math.sin(angle) * 200;
-            p.angle = angle;
+            aimAngle = Math.atan2(dy, dx);
           } else {
-            const aimAngle = Math.atan2(touch.clientY - p.y, touch.clientX - p.x);
-            engine.mouseX = touch.clientX;
-            engine.mouseY = touch.clientY;
-            p.angle = aimAngle;
+            aimAngle = Math.atan2(touch.clientY - p.y, touch.clientX - p.x);
           }
+          p.angle = aimAngle;
+          engine.mouseX = p.x + Math.cos(aimAngle) * 300;
+          engine.mouseY = p.y + Math.sin(aimAngle) * 300;
 
           setAimKnob({
             x: dist > 0 ? (dx / dist) * clamped : 0,
@@ -561,7 +561,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
         if (touch.identifier === aimTouchRef.current.id) {
           aimTouchRef.current.id = null;
-          engine.isTouchAimActive = false;
           setAimKnob({ x: 0, y: 0, active: false });
         }
       }
@@ -651,29 +650,17 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         p.x = Math.max(p.radius + 8, Math.min(engine.width - p.radius - 8, p.x));
         p.y = Math.max(p.radius + 8, Math.min(engine.height - p.radius - 8, p.y));
 
-        // CR14: Mobile auto-aim when player is not actively holding manual aim
-        if (engine.isTouchDevice && !engine.isTouchAimActive) {
-          let closestZ: Zombie | null = null;
-          let minDist = Infinity;
-          for (let zIdx = 0; zIdx < engine.zombies.length; zIdx++) {
-            const z = engine.zombies[zIdx];
-            if (z.state !== 'alive') continue;
-            const dist = Math.hypot(z.x - p.x, z.y - p.y);
-            if (dist < minDist) {
-              minDist = dist;
-              closestZ = z;
-            }
-          }
-          if (closestZ) {
-            engine.mouseX = closestZ.x;
-            engine.mouseY = closestZ.y;
-          }
+        if (engine.isTouchDevice) {
+          // On mobile: strictly manual twin-stick aiming. NO auto-aim / auto-targeting.
+          // Keep mouseX & mouseY projected along player's manually aimed angle as player moves.
+          engine.mouseX = p.x + Math.cos(p.angle) * 300;
+          engine.mouseY = p.y + Math.sin(p.angle) * 300;
+        } else {
+          // On PC: Player gun barrel & gaze strictly point towards mouse cursor
+          const dx = engine.mouseX - p.x;
+          const dy = engine.mouseY - p.y;
+          p.angle = Math.atan2(dy, dx);
         }
-
-        // Player gun barrel & gaze strictly point towards mouse / aim target
-        const dx = engine.mouseX - p.x;
-        const dy = engine.mouseY - p.y;
-        p.angle = Math.atan2(dy, dx);
 
         // Update Bullets
         for (let i = engine.bullets.length - 1; i >= 0; i--) {
